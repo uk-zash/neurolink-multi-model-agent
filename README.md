@@ -6,6 +6,12 @@ A production-ready **Retrieval-Augmented Generation (RAG)** system with multi-mo
 ![Multi--Model](https://img.shields.io/badge/Multi--Model-Evaluation-blue)
 ![Web-Search](https://img.shields.io/badge/Tavily-Web%20Search-orange)
 
+## 📸 Project Screenshot
+
+![RAG Multi-Model Agent Interface](image.png)
+
+*Beautiful web interface with drag-and-drop document upload and real-time RAG-powered question answering*
+
 ## 🌟 Features
 
 ### Core Capabilities

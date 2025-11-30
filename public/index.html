@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RAG Multi-Model Agent</title>
+    <!-- Marked.js for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -232,7 +234,110 @@
         .result-content {
             line-height: 1.8;
             color: #333;
-            white-space: pre-wrap;
+        }
+
+        /* Beautiful markdown styling */
+        .result-content h1, .result-content h2, .result-content h3 {
+            color: #667eea;
+            margin-top: 20px;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .result-content h1 { font-size: 1.8em; }
+        .result-content h2 { font-size: 1.5em; }
+        .result-content h3 { font-size: 1.3em; }
+
+        .result-content p {
+            margin-bottom: 15px;
+            line-height: 1.8;
+        }
+
+        .result-content ul, .result-content ol {
+            margin: 15px 0;
+            padding-left: 30px;
+        }
+
+        .result-content li {
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+
+        .result-content strong {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .result-content em {
+            color: #764ba2;
+            font-style: italic;
+        }
+
+        .result-content code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+
+        .result-content pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+
+        .result-content pre code {
+            background: none;
+            color: inherit;
+            padding: 0;
+        }
+
+        .result-content blockquote {
+            border-left: 4px solid #667eea;
+            padding-left: 15px;
+            margin: 15px 0;
+            color: #666;
+            font-style: italic;
+        }
+
+        .result-content a {
+            color: #667eea;
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .result-content a:hover {
+            border-bottom-color: #667eea;
+        }
+
+        .result-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        .result-content th, .result-content td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        .result-content th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+
+        .result-content hr {
+            border: none;
+            border-top: 2px solid #e0e0e0;
+            margin: 25px 0;
         }
 
         .sources {
@@ -590,19 +695,58 @@
         function displayResults(result) {
             const resultsSection = document.getElementById('resultsSection');
             
-            const finalResponse = result.finalResponse?.finalResponse || 
-                                 result.finalResponse || 
-                                 'No response generated';
+            // Extract just the final response text, not metadata
+            let responseText = '';
+            
+            if (result.finalResponse) {
+                if (typeof result.finalResponse === 'string') {
+                    // If it's a string, check if it contains metadata markers
+                    const text = result.finalResponse;
+                    
+                    // Try to extract content between "**Final Response**:" and "**Improvements Made**:" or "**Sources**:"
+                    const finalResponseMatch = text.match(/\*\*Final Response\*\*:\s*([\s\S]*?)(?:\*\*Improvements Made\*\*:|\*\*Sources\*\*:|$)/);
+                    
+                    if (finalResponseMatch && finalResponseMatch[1]) {
+                        responseText = finalResponseMatch[1].trim();
+                    } else {
+                        // If no match, use the entire string
+                        responseText = text;
+                    }
+                } else if (result.finalResponse.finalResponse) {
+                    // If it's an object, extract the finalResponse property
+                    const text = result.finalResponse.finalResponse;
+                    
+                    // Try to extract content between "**Final Response**:" and "**Improvements Made**:" or "**Sources**:"
+                    const finalResponseMatch = text.match(/\*\*Final Response\*\*:\s*([\s\S]*?)(?:\*\*Improvements Made\*\*:|\*\*Sources\*\*:|$)/);
+                    
+                    if (finalResponseMatch && finalResponseMatch[1]) {
+                        responseText = finalResponseMatch[1].trim();
+                    } else {
+                        responseText = text;
+                    }
+                }
+            }
+            
+            // If still empty, try to get it from the response
+            if (!responseText && result.response) {
+                responseText = result.response;
+            }
+            
+            if (!responseText) {
+                responseText = 'No response generated';
+            }
+            
+            // Convert markdown to HTML using marked.js
+            const renderedHTML = marked.parse(responseText);
             
             const sources = result.sources || [];
             
             resultsSection.innerHTML = `
                 <div class="result-card">
                     <div class="result-header">
-                        <h3>💡 Answer</h3>
                         <span class="processing-time">⏱️ ${result.processingTime}s</span>
                     </div>
-                    <div class="result-content">${finalResponse}</div>
+                    <div class="result-content">${renderedHTML}</div>
                     ${sources.length > 0 ? `
                         <div class="sources">
                             <div class="sources-label">📚 Sources:</div>
