@@ -50,3 +50,6 @@ build/
 .cache/
 temp/
 tmp/
+
+# User uploaded documents (each user has their own folder)
+documents/
