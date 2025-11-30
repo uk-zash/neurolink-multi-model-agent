@@ -159,6 +159,18 @@ User Query
 - "Explain the technical architecture described in the documentation"
 - "What skills are mentioned in the resume?"
 
+## 📊 Performance Metrics
+
+| Metric | Time |
+|--------|------|
+| Document Upload & Indexing | < 2 seconds |
+| Embedding Generation | < 1 second |
+| RAG Retrieval | < 1 second |
+| Web Search (Tavily) | 2-3 seconds |
+| Response Generation | 3-5 seconds |
+| Multi-Model Evaluation (3 models) | 10-15 seconds |
+| **Total Average Query Time** | **15-30 seconds** |
+
 ## 🔧 Configuration
 
 ### Models
@@ -256,17 +268,7 @@ Generates:
 - **Web Search**: 2-3 seconds
 - **Multi-Model Evaluation**: 10-15 seconds
 
-## 🧪 Testing
-
-See [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed testing instructions.
-
-## 📚 Additional Documentation
-
-- [RAG Quickstart Guide](RAG_QUICKSTART.md) - Quick overview of RAG concepts
-- [Setup Guide](SETUP_GUIDE.md) - Detailed setup instructions
-- [Git Push Guide](GIT_PUSH_GUIDE.md) - How to push to GitHub
-
-## 🤝 Contributing
+##  Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -283,7 +285,3 @@ MIT License - feel free to use this project for your own purposes.
 ## 📧 Support
 
 For issues or questions, please open an issue on GitHub.
-
----
-
-Made with ❤️ by [Your Name]
