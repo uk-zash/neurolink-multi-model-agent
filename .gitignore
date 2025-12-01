@@ -46,6 +46,10 @@ dist/
 build/
 *.tgz
 
+# TypeScript
+*.tsbuildinfo
+.tscache/
+
 # Misc
 .cache/
 temp/

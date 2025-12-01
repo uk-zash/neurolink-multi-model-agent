@@ -1,84 +1,101 @@
-require('dotenv').config();
-const { NeuroLink } = require('@juspay/neurolink');
-const RAGRetriever = require('./rag-retriever');
-const WebSearchService = require('./web-search');
+import { NeuroLink } from '@juspay/neurolink';
+import { DocumentManager } from './document-manager.js';
+import { EmbeddingService } from './embedding-service.js';
+import { RAGRetriever } from './rag-retriever.js';
+import { WebSearch } from './web-search.js';
+import { RAGConfig, WebSearchResult } from './types.js';
 
-/**
- * RAG-Enhanced Multi-Model Evaluation Agent
- * 
- * Architecture:
- * 1. Retrieve relevant information from documents (RAG)
- * 2. Enhance query based on document context
- * 3. Search the web with enhanced query
- * 4. Generate response using query + documents + web results
- * 5. Evaluate response with multiple models
- * 6. Aggregate evaluations and produce final response
- */
-class RAGMultiModelAgent {
-  constructor(config = {}) {
-    // Use free tier model from environment
+interface EvaluationModel {
+  provider: string;
+  model: string;
+  name: string;
+}
+
+interface Evaluation {
+  evaluatorName: string;
+  model: string;
+  provider: string;
+  evaluation: string;
+  timestamp: string;
+  error?: boolean;
+}
+
+interface ProcessResult {
+  success: boolean;
+  userQuery: string;
+  documentContext?: any;
+  queryEnhancement?: any;
+  webSearchResults?: WebSearchResult;
+  initialResponse?: string;
+  evaluations?: Evaluation[];
+  finalResult?: any;
+  duration?: string;
+  metadata?: any;
+  error?: string;
+}
+
+export class RAGMultiModelAgent {
+  private primaryProvider: string;
+  private primaryModel: string;
+  private evaluationModels: EvaluationModel[];
+  private aggregatorProvider: string;
+  private aggregatorModel: string;
+  private documentManager: DocumentManager;
+  private embeddingService: EmbeddingService;
+  private ragRetriever: RAGRetriever;
+  private webSearch: WebSearch;
+  private neurolink: NeuroLink;
+  private topK: number;
+
+  constructor(config: RAGConfig = { documentsPath: './documents' }) {
     const freeModel = process.env.GOOGLE_AI_MODEL || 'gemini-2.5-flash-lite';
     
-    // Primary model configuration
-    this.primaryProvider = config.primaryProvider || 'google-ai';
-    this.primaryModel = config.primaryModel || freeModel;
+    this.primaryProvider = config.provider || 'google-ai';
+    this.primaryModel = config.model || freeModel;
     
-    // Evaluation models (all using free tier)
-    this.evaluationModels = config.evaluationModels || [
+    this.evaluationModels = [
       { provider: 'google-ai', model: freeModel, name: 'Evaluator-1' },
       { provider: 'google-ai', model: freeModel, name: 'Evaluator-2' },
       { provider: 'google-ai', model: freeModel, name: 'Evaluator-3' }
     ];
     
-    // Aggregator model (using free tier)
-    this.aggregatorProvider = config.aggregatorProvider || 'google-ai';
-    this.aggregatorModel = config.aggregatorModel || freeModel;
+    this.aggregatorProvider = 'google-ai';
+    this.aggregatorModel = freeModel;
     
-    // RAG configuration
-    this.ragRetriever = new RAGRetriever({
-      documentsPath: config.documentsPath || './documents',
-      embedding: {
-        provider: 'google-ai',
-        model: process.env.GOOGLE_EMBEDDING_MODEL || 'text-embedding-004'
-      }
+    this.documentManager = new DocumentManager(config.documentsPath);
+    this.embeddingService = new EmbeddingService({
+      provider: 'google-ai',
+      model: process.env.GOOGLE_EMBEDDING_MODEL || 'text-embedding-004'
     });
+    this.ragRetriever = new RAGRetriever(this.documentManager, this.embeddingService);
+    this.webSearch = new WebSearch();
     
-    // Web search service
-    this.webSearch = new WebSearchService({
-      provider: this.primaryProvider,
-      model: this.primaryModel
-    });
-    
-    // NeuroLink instance
     this.neurolink = new NeuroLink({
       enableAnalytics: true,
       enableEvaluation: false
     });
     
-    this.topK = config.topK || 3; // Number of document chunks to retrieve
+    this.topK = 3;
   }
 
-  /**
-   * Initialize the RAG system by indexing documents
-   */
-  async initialize() {
+  async initialize(): Promise<void> {
     console.log('\n' + '█'.repeat(80));
     console.log('🚀 INITIALIZING RAG MULTI-MODEL AGENT');
     console.log('█'.repeat(80));
     
+    await this.documentManager.loadAllDocuments();
     await this.ragRetriever.indexDocuments();
     
     console.log('✅ Agent ready to process queries\n');
   }
 
-  /**
-   * Step 1: Retrieve relevant document context
-   */
-  async retrieveDocumentContext(userQuery) {
+  async retrieveDocumentContext(userQuery: string) {
     console.log('\n📚 Step 1: Retrieving relevant information from documents...');
     
-    if (!this.ragRetriever.isReady()) {
-      console.log('⚠️  No documents indexed. Proceeding without document context.');
+    const chunks = await this.ragRetriever.retrieve(userQuery, this.topK);
+    
+    if (chunks.length === 0) {
+      console.log('⚠️  No relevant document chunks found.');
       return {
         context: '',
         chunks: [],
@@ -86,20 +103,18 @@ class RAGMultiModelAgent {
       };
     }
     
-    const retrieval = await this.ragRetriever.retrieveContext(userQuery, this.topK);
+    const context = this.ragRetriever.formatContext(chunks);
+    const sources = [...new Set(chunks.map(c => c.source))];
     
-    console.log(`✅ Retrieved context from ${retrieval.sources.length} source(s)`);
+    console.log(`✅ Retrieved context from ${sources.length} source(s)`);
     console.log('-'.repeat(80));
-    console.log(retrieval.context.substring(0, 500) + '...');
+    console.log(context.substring(0, 500) + '...');
     console.log('-'.repeat(80));
     
-    return retrieval;
+    return { context, chunks, sources };
   }
 
-  /**
-   * Step 2: Enhance query based on document context
-   */
-  async enhanceQuery(userQuery, documentContext) {
+  async enhanceQuery(userQuery: string, documentContext: string) {
     console.log('\n🔧 Step 2: Enhancing query with document context...');
     
     if (!documentContext || documentContext.length === 0) {
@@ -107,51 +122,96 @@ class RAGMultiModelAgent {
       return { original: userQuery, enhanced: userQuery };
     }
     
-    const enhancement = await this.webSearch.enhanceQuery(userQuery, documentContext);
-    return enhancement;
+    const enhanced = await this.webSearch.enhanceQuery(userQuery, documentContext);
+    return { original: userQuery, enhanced };
   }
 
-  /**
-   * Step 3: Perform web search
-   */
-  async performWebSearch(enhancedQuery) {
+  async performWebSearch(enhancedQuery: string): Promise<WebSearchResult> {
     console.log('\n🌐 Step 3: Searching the web...');
     
-    const searchResults = await this.webSearch.search(enhancedQuery, 3);
-    return searchResults;
+    // Always perform web search for supplementary information
+    return this.webSearch.search(enhancedQuery, 3);
   }
 
-  /**
-   * Step 4: Generate comprehensive response
-   */
-  async generateResponse(userQuery, documentContext, webSearchResults) {
+  async generateResponse(
+    userQuery: string,
+    documentContext: string,
+    webSearchResults: WebSearchResult
+  ): Promise<string> {
     console.log('\n🤖 Step 4: Generating comprehensive response...');
     console.log(`Provider: ${this.primaryProvider}, Model: ${this.primaryModel}\n`);
     
-    const prompt = `You are a helpful AI assistant. Answer the user's query PRIMARILY using the uploaded document context. Web search results should only supplement information that's missing from the documents.
+    const hasDocuments = documentContext && documentContext.length > 0;
+    const hasWebResults = webSearchResults && webSearchResults.results && webSearchResults.results.length > 0;
+    
+    let prompt = '';
+    
+    if (hasDocuments) {
+      // Document-focused response (preferred)
+      const webResultsText = hasWebResults ? this.webSearch.formatResults(webSearchResults) : '';
+      
+      prompt = `You are a specialized AI assistant with access to both uploaded documents and web search results. PRIORITIZE the uploaded document content as your PRIMARY source.
 
 **User Query:**
 ${userQuery}
 
-**PRIMARY SOURCE - Uploaded Document Context:**
-${documentContext || 'No document context available.'}
+**PRIMARY SOURCE - UPLOADED DOCUMENT CONTENT:**
+${documentContext}
 
-**SUPPLEMENTARY SOURCE - Web Search Results (use only if documents don't have the information):**
-${webSearchResults.results || 'No web search results available.'}
+${hasWebResults ? `**SUPPLEMENTARY SOURCE - Web Search Results (for additional context):**
+${webResultsText}` : ''}
 
 **CRITICAL INSTRUCTIONS:**
-1. **PRIORITIZE DOCUMENTS FIRST**: Base your answer primarily on the uploaded document context
-2. **Use web search sparingly**: Only use web search to fill gaps or provide additional recent information not in documents
-3. **Clear Source Attribution**: Always indicate when information comes from documents vs. web
-4. **Document Authority**: Treat uploaded documents as the primary authoritative source
-5. **Comprehensive Answer**: Provide detailed information from the documents first, then supplement with web if needed
+1. **DOCUMENTS FIRST**: Base your answer PRIMARILY on the uploaded document content - this is your main source of truth
+2. **Comprehensive Document Analysis**: Extract and present ALL relevant information from the documents in detail
+3. **Web as Supplement**: Use web search results ONLY to:
+   - Provide additional recent information not in documents
+   - Add broader context that complements the document information
+   - Fill small gaps if documents don't fully cover the query
+4. **Clear Source Attribution**: 
+   - Start with document-based information
+   - Clearly label any web information as "Additional context from web search:"
+5. **Direct Citations**: Reference specific details from the documents
 
 **Response Structure:**
-- Start with information from uploaded documents
-- Clearly mark any supplementary web information as "Additional context from web:"
-- Cite sources explicitly
+1. Begin with a comprehensive answer based on uploaded documents
+2. Include all relevant details, facts, and information from the documents
+3. If web results provide valuable supplementary information, add it at the end with clear labeling
+4. Make it crystal clear which information comes from documents vs. web
 
 **Your Response:**`;
+    } else if (hasWebResults) {
+      // Fallback to web search only
+      const webResultsText = this.webSearch.formatResults(webSearchResults);
+      
+      prompt = `You are a helpful AI assistant. The user uploaded documents, but they don't contain relevant information for this query. Use web search results as a fallback.
+
+**User Query:**
+${userQuery}
+
+**Note:** No relevant information found in uploaded documents.
+
+**Web Search Results:**
+${webResultsText}
+
+**Instructions:**
+- Clearly state that the information comes from web search, not uploaded documents
+- Provide a helpful answer based on web results
+- Suggest the user upload relevant documents if they have them
+
+**Your Response:**`;
+    } else {
+      // No context available
+      prompt = `You are a helpful AI assistant. 
+
+**User Query:**
+${userQuery}
+
+**Note:** No documents have been uploaded and no web search results are available.
+
+**Your Response:**
+Please inform the user that no documents have been uploaded yet and suggest they upload relevant documents to get a comprehensive answer based on their data.`;
+    }
 
     try {
       const result = await this.neurolink.generate({
@@ -168,17 +228,19 @@ ${webSearchResults.results || 'No web search results available.'}
       console.log('-'.repeat(80));
       
       return response;
-      
     } catch (error) {
-      console.error('❌ Error generating response:', error.message);
+      const err = error as Error;
+      console.error('❌ Error generating response:', err.message);
       throw error;
     }
   }
 
-  /**
-   * Step 5: Evaluate response with multiple models
-   */
-  async evaluateResponse(userQuery, response, documentContext, webSearchResults) {
+  async evaluateResponse(
+    userQuery: string,
+    response: string,
+    documentContext: string,
+    webSearchResults: WebSearchResult
+  ): Promise<Evaluation[]> {
     console.log('\n🔍 Step 5: Evaluating response with multiple models...\n');
     
     const evaluationPrompt = `You are an expert evaluator. Analyze the following response to a user query. The response was generated using both document context and web search results.
@@ -217,7 +279,7 @@ Provide structured evaluation.`;
           model: evalModel.model
         });
         
-        const evaluation = {
+        const evaluation: Evaluation = {
           evaluatorName: evalModel.name,
           model: evalModel.model,
           provider: evalModel.provider,
@@ -227,14 +289,14 @@ Provide structured evaluation.`;
         
         console.log(`✅ ${evalModel.name} completed evaluation`);
         return evaluation;
-        
       } catch (error) {
-        console.error(`❌ ${evalModel.name} failed:`, error.message);
+        const err = error as Error;
+        console.error(`❌ ${evalModel.name} failed:`, err.message);
         return {
           evaluatorName: evalModel.name,
           model: evalModel.model,
           provider: evalModel.provider,
-          evaluation: `Error: ${error.message}`,
+          evaluation: `Error: ${err.message}`,
           error: true,
           timestamp: new Date().toISOString()
         };
@@ -246,9 +308,9 @@ Provide structured evaluation.`;
     console.log('\n✅ All evaluations completed!\n');
     
     evaluations.forEach((evaluation, index) => {
-      console.log(`${'='.repeat(80)}`);
+      console.log('='.repeat(80));
       console.log(`Evaluation ${index + 1}: ${evaluation.evaluatorName} (${evaluation.model})`);
-      console.log(`${'='.repeat(80)}`);
+      console.log('='.repeat(80));
       console.log(evaluation.evaluation);
       console.log('');
     });
@@ -256,10 +318,12 @@ Provide structured evaluation.`;
     return evaluations;
   }
 
-  /**
-   * Step 6: Aggregate evaluations and generate final response
-   */
-  async aggregateAndFinalize(userQuery, initialResponse, evaluations, sources) {
+  async aggregateAndFinalize(
+    userQuery: string,
+    initialResponse: string,
+    evaluations: Evaluation[],
+    sources: string[]
+  ) {
     console.log('\n🎯 Step 6: Aggregating evaluations and generating final response...\n');
     
     const evaluationsSummary = evaluations
@@ -318,17 +382,14 @@ ${evaluationsSummary}
           timestamp: new Date().toISOString()
         }
       };
-      
     } catch (error) {
-      console.error('❌ Error in aggregation:', error.message);
+      const err = error as Error;
+      console.error('❌ Error in aggregation:', err.message);
       throw error;
     }
   }
 
-  /**
-   * Main processing pipeline
-   */
-  async process(userQuery) {
+  async process(userQuery: string): Promise<ProcessResult> {
     console.log('\n' + '█'.repeat(80));
     console.log('🧠 RAG MULTI-MODEL EVALUATION AGENT');
     console.log('█'.repeat(80));
@@ -336,38 +397,14 @@ ${evaluationsSummary}
     const startTime = Date.now();
     
     try {
-      // Step 1: Retrieve document context
       const retrieval = await this.retrieveDocumentContext(userQuery);
-      
-      // Step 2: Enhance query
       const queryEnhancement = await this.enhanceQuery(userQuery, retrieval.context);
-      
-      // Step 3: Web search
       const webResults = await this.performWebSearch(queryEnhancement.enhanced);
+      const response = await this.generateResponse(userQuery, retrieval.context, webResults);
+      const evaluations = await this.evaluateResponse(userQuery, response, retrieval.context, webResults);
       
-      // Step 4: Generate response
-      const response = await this.generateResponse(
-        userQuery,
-        retrieval.context,
-        webResults
-      );
-      
-      // Step 5: Evaluate response
-      const evaluations = await this.evaluateResponse(
-        userQuery,
-        response,
-        retrieval.context,
-        webResults
-      );
-      
-      // Step 6: Aggregate and finalize
       const allSources = [...retrieval.sources, 'Web Search'];
-      const finalResult = await this.aggregateAndFinalize(
-        userQuery,
-        response,
-        evaluations,
-        allSources
-      );
+      const finalResult = await this.aggregateAndFinalize(userQuery, response, evaluations, allSources);
       
       const endTime = Date.now();
       const duration = ((endTime - startTime) / 1000).toFixed(2);
@@ -395,16 +432,14 @@ ${evaluationsSummary}
           timestamp: new Date().toISOString()
         }
       };
-      
     } catch (error) {
-      console.error('\n❌ PROCESS FAILED:', error.message);
+      const err = error as Error;
+      console.error('\n❌ PROCESS FAILED:', err.message);
       return {
         success: false,
-        error: error.message,
+        error: err.message,
         userQuery
       };
     }
   }
 }
-
-module.exports = RAGMultiModelAgent;

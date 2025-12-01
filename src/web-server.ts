@@ -1,43 +1,42 @@
-const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs').promises;
-const crypto = require('crypto');
-const RAGMultiModelAgent = require('./rag-multi-model-agent');
+import 'dotenv/config';
+import express, { Request, Response, NextFunction } from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs/promises';
+import fsSync from 'fs';
+import crypto from 'crypto';
+import { RAGMultiModelAgent } from './rag-multi-model-agent.js';
 
 const app = express();
 const PORT = process.env.PORT || 3002;
 
 // Store user agents in memory
-const userAgents = new Map();
+const userAgents = new Map<string, RAGMultiModelAgent>();
+
+// Store userId temporarily for multer destination callback
+let tempUserId = 'default';
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: (_req, _file, cb) => {
     const userId = tempUserId;
     const userDir = path.join('./documents', userId);
     
-    // Create directory synchronously to avoid race conditions
-    const fsSync = require('fs');
     if (!fsSync.existsSync(userDir)) {
       fsSync.mkdirSync(userDir, { recursive: true });
     }
     
     cb(null, userDir);
   },
-  filename: (req, file, cb) => {
-    // Keep original filename, clean it up
+  filename: (_req, file, cb) => {
     const cleanName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
     cb(null, cleanName);
   }
 });
 
-// Store userId temporarily for multer destination callback
-let tempUserId = 'default';
-
 const upload = multer({
   storage: storage,
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req, file, cb) => {
     const allowedTypes = ['.txt', '.md', '.pdf', '.docx', '.json'];
     const ext = path.extname(file.originalname).toLowerCase();
     if (allowedTypes.includes(ext)) {
@@ -52,9 +51,8 @@ const upload = multer({
 });
 
 // Middleware to extract userId before multer processes the file
-const extractUserId = (req, res, next) => {
-  // Parse userId from query or default
-  tempUserId = req.query.userId || req.body.userId || 'default';
+const extractUserId = (req: Request, _res: Response, next: NextFunction) => {
+  tempUserId = (req.query.userId as string) || (req.body.userId as string) || 'default';
   next();
 };
 
@@ -63,9 +61,9 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // Initialize RAG agent for a specific user
-async function getUserAgent(userId) {
+async function getUserAgent(userId: string): Promise<RAGMultiModelAgent> {
   if (userAgents.has(userId)) {
-    return userAgents.get(userId);
+    return userAgents.get(userId)!;
   }
   
   console.log(`🚀 Initializing RAG Agent for user: ${userId}`);
@@ -76,8 +74,7 @@ async function getUserAgent(userId) {
   const agent = new RAGMultiModelAgent({
     documentsPath: userDocPath,
     provider: 'google-ai',
-    model: process.env.GOOGLE_AI_MODEL || 'gemini-2.5-flash-lite',
-    evaluatorCount: 3
+    model: process.env.GOOGLE_AI_MODEL || 'gemini-2.5-flash-lite'
   });
   
   await agent.initialize();
@@ -88,15 +85,15 @@ async function getUserAgent(userId) {
   return agent;
 }
 
-// Generate user ID (in production, use proper authentication)
-function generateUserId() {
+// Generate user ID
+function generateUserId(): string {
   return crypto.randomBytes(8).toString('hex');
 }
 
 // API Routes
 
 // Create new user session
-app.post('/api/user/create', (req, res) => {
+app.post('/api/user/create', (_req: Request, res: Response) => {
   const userId = generateUserId();
   res.json({ 
     success: true, 
@@ -106,9 +103,9 @@ app.post('/api/user/create', (req, res) => {
 });
 
 // Get list of uploaded documents for a user
-app.get('/api/documents', async (req, res) => {
+app.get('/api/documents', async (req: Request, res: Response) => {
   try {
-    const userId = req.query.userId || 'default';
+    const userId = (req.query.userId as string) || 'default';
     const userDir = path.join('./documents', userId);
     
     try {
@@ -125,12 +122,13 @@ app.get('/api/documents', async (req, res) => {
       res.json({ success: true, documents: [], userId });
     }
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    const err = error as Error;
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // Upload document
-app.post('/api/upload', extractUserId, upload.single('document'), async (req, res) => {
+app.post('/api/upload', extractUserId, upload.single('document'), async (req: Request, res: Response) => {
   try {
     console.log('📤 Upload request received');
     console.log('Body userId:', req.body.userId);
@@ -149,7 +147,6 @@ app.post('/api/upload', extractUserId, upload.single('document'), async (req, re
     console.log(`📄 User: ${userId}`);
     
     // Verify file exists
-    const fsSync = require('fs');
     if (!fsSync.existsSync(req.file.path)) {
       throw new Error('File was not saved properly');
     }
@@ -168,18 +165,19 @@ app.post('/api/upload', extractUserId, upload.single('document'), async (req, re
       userId
     });
   } catch (error) {
-    console.error('❌ Upload error:', error);
+    const err = error as Error;
+    console.error('❌ Upload error:', err);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: err.message 
     });
   }
 });
 
 // Delete document
-app.delete('/api/documents/:filename', async (req, res) => {
+app.delete('/api/documents/:filename', async (req: Request, res: Response) => {
   try {
-    const userId = req.query.userId || 'default';
+    const userId = (req.query.userId as string) || 'default';
     const filename = req.params.filename;
     const filepath = path.join('./documents', userId, filename);
     
@@ -196,16 +194,17 @@ app.delete('/api/documents/:filename', async (req, res) => {
       userId
     });
   } catch (error) {
-    console.error('Delete error:', error);
+    const err = error as Error;
+    console.error('Delete error:', err);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: err.message 
     });
   }
 });
 
 // Query endpoint
-app.post('/api/query', async (req, res) => {
+app.post('/api/query', async (req: Request, res: Response) => {
   try {
     const { query, userId } = req.body;
     
@@ -236,16 +235,17 @@ app.post('/api/query', async (req, res) => {
       userId: userIdToUse
     });
   } catch (error) {
-    console.error('Query error:', error);
+    const err = error as Error;
+    console.error('Query error:', err);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: err.message 
     });
   }
 });
 
 // Health check
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ 
     success: true, 
     status: 'healthy',

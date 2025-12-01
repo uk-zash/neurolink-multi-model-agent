@@ -1,0 +1,18 @@
+run = "npm install && npm run build && npm start"
+hidden = [".config", "package-lock.json", "tsconfig.json"]
+modules = ["nodejs-20"]
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+run = ["sh", "-c", "npm install && npm run build && npm start"]
+deploymentTarget = "cloudrun"
+
+[env]
+PATH = "/home/runner/$REPL_SLUG/.config/npm/node_global/bin:/home/runner/$REPL_SLUG/node_modules/.bin"
+npm_config_prefix = "/home/runner/$REPL_SLUG/.config/npm/node_global"
+
+[[ports]]
+localPort = 3002
+externalPort = 80
