@@ -1,93 +1,158 @@
-# RAG Multi-Model Agent (TypeScript)
+# 🧠 RAG Multi-Model Agent (TypeScript)
 
-A production-ready **Retrieval-Augmented Generation (RAG)** system with multi-model evaluation, built entirely in **TypeScript**. Upload documents, ask questions, and get AI-powered answers with web search integration and multi-model quality assessment.
+A production-ready **Retrieval-Augmented Generation (RAG)** system with multi-model evaluation, built entirely in **TypeScript**. Features document upload, web search integration, and intelligent response generation.
 
-## 🚀 Features
+![RAG System](https://img.shields.io/badge/RAG-Enabled-brightgreen)
+![Multi--Model](https://img.shields.io/badge/Multi--Model-Evaluation-blue)
+![Web-Search](https://img.shields.io/badge/Tavily-Web%20Search-orange)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue)
 
-- **📚 Document RAG**: Upload and query PDF, DOCX, TXT, MD, and JSON files
-- **🔍 Semantic Search**: Vector-based document retrieval using embeddings
-- **🌐 Web Search Integration**: Enhanced answers with Tavily web search
-- **🤖 Multi-Model Evaluation**: 3 AI models evaluate responses for quality
-- **✨ Query Enhancement**: Automatic query optimization based on context
-- **💪 TypeScript**: Full type safety and modern ES modules
-- **🎯 Production Ready**: Built with Express.js, proper error handling
+## 🌟 Features
 
-## 📋 Architecture
+### Core Capabilities
+
+- **📚 Document RAG System**
+  - Upload and index documents (PDF, TXT, MD, DOCX, JSON)
+  - Automatic text chunking and embedding generation
+  - Vector similarity search for relevant context retrieval
+  - Support for multiple document formats
+
+- **🔐 User Isolation**
+  - Each user has their own document folder
+  - No mixing of documents between users
+  - Session-based user identification
+  - Persistent sessions via localStorage
+
+- **🌐 Web Search Integration (Tavily)**
+  - AI-optimized web search
+  - Smart query enhancement based on document context
+  - Supplements document information with web data
+
+- **🎯 Document Prioritization**
+  - Uploaded documents are the PRIMARY source
+  - Web search only supplements missing information
+  - Clear source attribution in responses
+
+- **🧠 Multi-Model Evaluation**
+  - 3 models evaluate each response
+  - Quality scoring (accuracy, relevance, completeness)
+  - Aggregated final response with improvements
+
+- **💻 Beautiful Web Interface**
+  - Drag-and-drop file upload
+  - Real-time document management
+  - Interactive query interface
+  - Response visualization
+
+- **💪 TypeScript**
+  - Full type safety and modern ES modules
+  - Proper error handling
+  - Type-safe API endpoints
+
+## 🏗️ System Architecture
 
 ```
 User Query
     ↓
-1. Retrieve relevant document chunks (RAG)
+┌─────────────────────────────────────────────┐
+│  1. RAG Document Retrieval                  │
+│     - Search user's documents               │
+│     - Retrieve top-3 relevant chunks        │
+│     - 768-dim embeddings (Google AI)        │
+└─────────────────────────────────────────────┘
     ↓
-2. Enhance query with document context
+┌─────────────────────────────────────────────┐
+│  2. Smart Query Enhancement                 │
+│     - Analyze document context              │
+│     - Create focused web search query       │
+└─────────────────────────────────────────────┘
     ↓
-3. Search web with enhanced query
+┌─────────────────────────────────────────────┐
+│  3. Web Search (Tavily)                     │
+│     - Fetch relevant web information        │
+│     - AI-generated summaries                │
+└─────────────────────────────────────────────┘
     ↓
-4. Generate response (Query + Documents + Web)
+┌─────────────────────────────────────────────┐
+│  4. Response Generation                     │
+│     - Combine documents + web data          │
+│     - Generate comprehensive answer         │
+│     - Clear source attribution              │
+└─────────────────────────────────────────────┘
     ↓
-5. Evaluate with 3 models
+┌─────────────────────────────────────────────┐
+│  5. Multi-Model Evaluation (3 models)       │
+│     - Accuracy scoring                      │
+│     - Relevance assessment                  │
+│     - Completeness check                    │
+└─────────────────────────────────────────────┘
     ↓
-6. Aggregate & produce final answer
+┌─────────────────────────────────────────────┐
+│  6. Final Response Generation               │
+│     - Aggregate evaluations                 │
+│     - Apply improvements                    │
+│     - Deliver optimized answer              │
+└─────────────────────────────────────────────┘
 ```
 
-## 🛠️ Tech Stack
-
-- **Language**: TypeScript 5.3+
-- **Runtime**: Node.js 18+
-- **AI Models**: Google Gemini (via NeuroLink)
-- **Embeddings**: Google text-embedding-004
-- **Web Search**: Tavily API
-- **Framework**: Express.js
-- **Build**: TypeScript Compiler (tsc)
-- **Dev**: tsx for hot-reloading
-
-## 📦 Installation
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Node.js 18 or higher
+- Node.js 18+ installed
 - npm or yarn
-- Google AI API key
-- (Optional) Tavily API key for web search
+- API keys for:
+  - Google AI (Gemini)
+  - Tavily (web search)
 
-### Setup
+### Installation
 
 1. **Clone the repository**
-```bash
-git clone <your-repo-url>
-cd hackathon
-```
+   ```bash
+   git clone https://github.com/uk-zash/neurolink-multi-model-agent.git
+   cd neurolink-multi-model-agent
+   ```
 
 2. **Install dependencies**
-```bash
-npm install
-```
+   ```bash
+   npm install
+   ```
 
-3. **Configure environment variables**
-```bash
-cp .env.example .env
-```
+3. **Set up environment variables**
+   ```bash
+   cp .env.example .env
+   ```
 
-Edit `.env` and add your API keys:
-```env
-# Required: Google AI API Key
-GOOGLE_API_KEY=your_google_api_key_here
+   Edit `.env` and add your API keys:
+   ```env
+   # Required: Google AI API Key
+   GOOGLE_AI_API_KEY=your_google_ai_api_key_here
 
-# Model Configuration
-GOOGLE_AI_MODEL=gemini-2.0-flash-exp
-GOOGLE_EMBEDDING_MODEL=text-embedding-004
+   # Model Configuration (Optional - these are defaults)
+   GOOGLE_AI_MODEL=gemini-2.5-flash-lite
+   GOOGLE_EMBEDDING_MODEL=text-embedding-004
 
-# Optional: Web Search
-TAVILY_API_KEY=your_tavily_api_key_here
+   # Optional: Web Search
+   TAVILY_API_KEY=your_tavily_api_key_here
 
-# Server Configuration
-PORT=3002
-```
+   # Server Configuration
+   PORT=3002
+   ```
 
 4. **Build the project**
-```bash
-npm run build
-```
+   ```bash
+   npm run build
+   ```
+
+5. **Start the server**
+   ```bash
+   npm start
+   ```
+
+6. **Open your browser**
+   ```
+   http://localhost:3002
+   ```
 
 ## 🎯 Usage
 
@@ -102,12 +167,47 @@ npm run build
 npm start
 ```
 
-The server will start at `http://localhost:3002`
+### Upload Documents
+
+1. Click the upload area or drag-and-drop files
+2. Supported formats: PDF, TXT, MD, DOCX, JSON
+3. Maximum file size: 10MB
+4. Documents are automatically indexed
+
+### Ask Questions
+
+1. Type your question in the search box
+2. The system will:
+   - Search your uploaded documents
+   - Enhance the query with document context
+   - Perform web search if needed
+   - Generate a comprehensive answer
+   - Evaluate the response with 3 models
+   - Return the optimized final answer
+
+### Example Queries
+
+- "Summarize the key points from my documents"
+- "What are the main findings in the research paper?"
+- "Explain the technical architecture described in the documentation"
+- "What skills are mentioned in the resume?"
+
+## 📊 Performance Metrics
+
+| Metric | Time |
+|--------|------|
+| Document Upload & Indexing | < 2 seconds |
+| Embedding Generation | < 1 second |
+| RAG Retrieval | < 1 second |
+| Web Search (Tavily) | 2-3 seconds |
+| Response Generation | 3-5 seconds |
+| Multi-Model Evaluation (3 models) | 10-15 seconds |
+| **Total Average Query Time** | **15-30 seconds** |
 
 ## 📁 Project Structure
 
 ```
-hackathon/
+neurolink-multi-model-agent/
 ├── src/                          # TypeScript source files
 │   ├── web-server.ts            # Express server & API endpoints
 │   ├── rag-multi-model-agent.ts # Main RAG agent orchestration
@@ -119,12 +219,52 @@ hackathon/
 │   └── neurolink.d.ts           # NeuroLink type declarations
 ├── dist/                         # Compiled JavaScript (generated)
 ├── documents/                    # User documents storage
+│   ├── user1/
+│   ├── user2/
+│   └── ...
 ├── public/                       # Frontend files
 │   └── index.html               # Web interface
 ├── package.json                  # Dependencies & scripts
 ├── tsconfig.json                # TypeScript configuration
+├── .env.example                 # Environment template
 └── README.md                    # This file
 ```
+
+## 🛠️ Core Components
+
+### RAG Multi-Model Agent (`src/rag-multi-model-agent.ts`)
+Main orchestrator that:
+- Manages the RAG pipeline
+- Coordinates document retrieval
+- Handles web search integration
+- Manages multi-model evaluation
+- Generates final responses
+
+### RAG Retriever (`src/rag-retriever.ts`)
+Handles:
+- Document loading and chunking
+- Embedding generation
+- Vector similarity search
+- Context retrieval
+
+### Web Search (`src/web-search.ts`)
+Provides:
+- Tavily API integration
+- Query enhancement
+- AI-generated summaries
+- Source tracking
+
+### Document Manager (`src/document-manager.ts`)
+Supports:
+- Multiple file formats (PDF, DOCX, TXT, MD, JSON)
+- Text extraction
+- Document preprocessing
+
+### Embedding Service (`src/embedding-service.ts`)
+Generates:
+- High-quality embeddings using Google AI
+- 768-dimensional vectors
+- Batch processing support
 
 ## 🔌 API Endpoints
 
@@ -171,33 +311,24 @@ Health check endpoint
 curl http://localhost:3002/api/health
 ```
 
-## 🧪 Testing
-
-1. **Open the web interface**: Navigate to `http://localhost:3002`
-2. **Upload documents**: Click "Choose File" and upload PDFs, DOCX, or TXT files
-3. **Ask questions**: Type a query about your documents
-4. **Get AI answers**: Receive comprehensive responses with source citations
-
-## 📊 Example Workflow
-
-1. Upload a research paper (PDF)
-2. Ask: "What are the key findings?"
-3. The system will:
-   - Retrieve relevant sections from the paper
-   - Enhance the query based on document context
-   - Search the web for additional context
-   - Generate a comprehensive answer
-   - Evaluate the response with 3 models
-   - Return the best final answer with sources
-
 ## 🔧 Configuration
 
 ### Models
 
-Edit `src/rag-multi-model-agent.ts` to customize:
-- Primary model for response generation
-- Evaluation models (default: 3 evaluators)
-- Aggregator model for final synthesis
+The system uses Google AI (Gemini) models via NeuroLink:
+- **Main Model**: `gemini-2.5-flash-lite`
+- **Evaluators**: 3x `gemini-2.5-flash-lite`
+- **Embeddings**: `text-embedding-004`
+
+You can change the model in `src/rag-multi-model-agent.ts`:
+```typescript
+const agent = new RAGMultiModelAgent({
+  documentsPath: userDocPath,
+  provider: 'google-ai',
+  model: 'gemini-2.5-flash-lite', // Change this
+  evaluatorCount: 3
+});
+```
 
 ### Chunking
 
@@ -227,9 +358,9 @@ NODE_ENV=production npm start
 
 ### Environment Variables for Production
 Ensure these are set:
-- `GOOGLE_API_KEY`
-- `PORT` (optional, defaults to 3002)
+- `GOOGLE_AI_API_KEY` (required)
 - `TAVILY_API_KEY` (optional, for web search)
+- `PORT` (optional, defaults to 3002)
 
 ## 📝 TypeScript Migration
 
@@ -244,16 +375,24 @@ This project has been fully converted to TypeScript with:
 
 ```json
 {
-  "build": "tsc",                    // Compile TypeScript
-  "start": "node dist/web-server.js", // Run compiled code
-  "dev": "tsx src/web-server.ts",    // Development with tsx
+  "build": "tsc",                          // Compile TypeScript
+  "start": "node dist/web-server.js",      // Run compiled code
+  "dev": "tsx src/web-server.ts",          // Development with tsx
   "dev:watch": "tsx watch src/web-server.ts", // Hot-reload dev
-  "clean": "rm -rf dist"             // Clean build artifacts
+  "clean": "rm -rf dist"                   // Clean build artifacts
 }
 ```
 
+## 🔒 Privacy & Security
+
+- **User Isolation**: Each user's documents are stored in separate folders
+- **Session Management**: Secure user sessions with localStorage
+- **No Data Sharing**: Documents never mixed between users
+- **API Key Security**: Environment variables for sensitive data
+
 ## 🤝 Contributing
 
+Contributions are welcome! Please:
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes (TypeScript)
@@ -262,41 +401,14 @@ This project has been fully converted to TypeScript with:
 
 ## 📄 License
 
-MIT License - see LICENSE file for details
+MIT License - feel free to use this project for your own purposes.
 
 ## 🙏 Acknowledgments
 
-- Google Gemini AI for language models
-- NeuroLink for multi-model orchestration
-- Tavily for web search API
-- TypeScript community for excellent tooling
-
-## 🐛 Troubleshooting
-
-### Build Errors
-```bash
-npm run clean
-npm run build
-```
-
-### Module Resolution Issues
-Ensure `"type": "module"` is in package.json and all imports use `.js` extensions:
-```typescript
-import { RAGRetriever } from './rag-retriever.js';
-```
-
-### API Key Issues
-Verify your `.env` file has valid keys:
-```bash
-cat .env | grep API_KEY
-```
-
-## 📞 Support
-
-For issues, questions, or contributions:
-- Open an issue on GitHub
-- Check existing documentation
-- Review TypeScript compilation errors in `dist/`
+- **Google Gemini AI** for language models
+- **NeuroLink** for multi-model orchestration
+- **Tavily** for web search API
+- **TypeScript** community for excellent tooling
 
 ---
 
